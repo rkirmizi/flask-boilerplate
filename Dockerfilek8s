@@ -1,0 +1,23 @@
+FROM python:3.7.4-alpine3.9
+RUN mkdir /service
+WORKDIR /service
+ENV PYTHONPATH=/service
+RUN pip install pipenv
+RUN apk add --no-cache --virtual .build-deps gcc musl-dev python-dev build-base
+RUN apk add --no-cache openssl-dev libffi-dev
+RUN apk add postgresql-dev
+RUN rm -rf /var/cache/apk/*
+
+COPY Pipfile Pipfile
+COPY  Pipfile.lock Pipfile.lock
+RUN pipenv install --deploy --system -d
+
+ENV FLASK_APP="app.app:app"
+ENV DEBUG=True
+ENV FLASK_PORT=5000
+ENV SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://user:pass@dbhost:5432/dbname
+
+ADD ./app /service/app/
+RUN apk update && apk add bash
+
+CMD sh -c "gunicorn app.app:app -b 0.0.0.0:${FLASK_PORT} --log-level debug --timeout 90  --reload --error-logfile -"
